@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neon Tic Tac Toe multi round game</title>
+<style>
+  body {
+    background-color: #000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #0ff;
+  }
+  .container {
+    text-align: center;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    grid-template-rows: repeat(3, 100px);
+    gap: 15px;
+    border-radius: 50%;
+    width: 350px;
+    height: 350px;
+    background: radial-gradient(circle, #0ff 40%, #004d4d 100%);
+    padding: 20px;
+    box-shadow: 0 0 20px #0ff, 0 0 40px #0ff inset;
+    margin: 0 auto 20px auto;
+  }
+  .cell {
+    background: #001f1f;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 3rem;
+    color: #0ff;
+    cursor: pointer;
+    box-shadow: 0 0 10px #0ff;
+    transition: background 0.3s ease;
+    user-select: none;
+  }
+  .cell:hover {
+    background: #00ffffcc;
+  }
+  .winner-message {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+    text-shadow: 0 0 10px #0ff;
+    min-height: 2em;
+  }
+  .controls {
+    margin-bottom: 15px;
+  }
+  .scoreboard {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #0ff;
+    text-shadow: 0 0 5px #0ff;
+  }
+  button {
+    background-color: #0ff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 1rem;
+    cursor: pointer;
+    color: #000;
+    box-shadow: 0 0 10px #0ff;
+    transition: background-color 0.3s ease;
+    margin: 0 5px;
+  }
+  button:hover {
+    background-color: #00cccc;
+  }
+  .footer {
+    margin-top: 30px;
+    color: #0ff;
+    text-align: center;
+    font-size: 1rem;
+    text-shadow: 0 0 5px #0ff;
+    letter-spacing: 1px;
+    opacity: 0.85;
+  }
+  .highlight {
+    animation: highlight 0.8s ease-in-out;
+  }
+  @keyframes highlight {
+    0% { background: #00ffffcc; }
+    100% { background: #001f1f; }
+  }
+  .round-input {
+    width: 60px;
+    font-size: 1rem;
+    padding: 5px;
+    border-radius: 10px;
+    border: none;
+    margin-right: 5px;
+    text-align: center;
+  }
+  .error-msg {
+    color: #ff4d4d;
+    font-size: 1rem;
+    margin-bottom: 8px;
+    min-height: 1.2em;
+    text-shadow: 0 0 5px #ff4d4d;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="controls">
+      <input id="roundInput" class="round-input" type="number" min="1" max="20" value="1" />
+      <button id="setRoundsBtn">Set Rounds</button>
+      <button id="restartBtn">Restart</button>
+      <button id="undoBtn">Undo</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <div class="scoreboard" id="scoreboard"></div>
+    <div class="winner-message" id="winnerMessage"></div>
+    <div class="board" id="board">
+      <div class="cell" data-index="0"></div>
+      <div class="cell" data-index="1"></div>
+      <div class="cell" data-index="2"></div>
+      <div class="cell" data-index="3"></div>
+      <div class="cell" data-index="4"></div>
+      <div class="cell" data-index="5"></div>
+      <div class="cell" data-index="6"></div>
+      <div class="cell" data-index="7"></div>
+      <div class="cell" data-index="8"></div>
+    </div>
+    <button id="downloadBtn">Download Winner Screenshot</button>
+  </div>
+  <div class="footer">
+    Owner: Saurya Kapoor
+  </div>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script>
+  const board = document.getElementById('board');
+  const cells = document.querySelectorAll('.cell');
+  const winnerMessage = document.getElementById('winnerMessage');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const scoreboard = document.getElementById('scoreboard');
+  const undoBtn = document.getElementById('undoBtn');
+  const roundInput = document.getElementById('roundInput');
+  const setRoundsBtn = document.getElementById('setRoundsBtn');
+  const errorMsg = document.getElementById('errorMsg');
+
+  let currentPlayer = 'X';
+  let gameActive = true;
+  let boardState = ['', '', '', '', '', '', '', '', ''];
+  let round = 1;
+  let totalRounds = parseInt(roundInput.value, 10);
+  let scores = { X: 0, O: 0, Draws: 0 };
+  let moveHistory = [];
+
+  const MIN_ROUNDS = 1;
+  const MAX_ROUNDS = 20;
+
+  const winningConditions = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6]
+  ];
+
+  function updateScoreboard() {
+    scoreboard.textContent = `Round: ${round}/${totalRounds} | X: ${scores.X} | O: ${scores.O} | Draws: ${scores.Draws}`;
+  }
+
+  function handleCellClick(e) {
+    const clickedCell = e.target;
+    const clickedIndex = parseInt(clickedCell.getAttribute('data-index'));
+
+    if (boardState[clickedIndex] !== '' || !gameActive) {
+      return;
+    }
+
+    boardState[clickedIndex] = currentPlayer;
+    clickedCell.textContent = currentPlayer;
+    moveHistory.push({index: clickedIndex, player: currentPlayer});
+
+    if (checkWinner()) {
+      winnerMessage.textContent = `Player ${currentPlayer} wins!`;
+      scores[currentPlayer]++;
+      gameActive = false;
+      highlightWinningCells();
+      updateScoreboard();
+      setTimeout(nextRound, 1500);
+      return;
+    }
+
+    if (boardState.every(cell => cell !== '')) {
+      winnerMessage.textContent = "It's a draw!";
+      scores.Draws++;
+      gameActive = false;
+      updateScoreboard();
+      setTimeout(nextRound, 1500);
+      return;
+    }
+
+    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+  }
+
+  function checkWinner() {
+    return winningConditions.some(condition => {
+      const [a, b, c] = condition;
+      if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+        board.dataset.winning = JSON.stringify([a, b, c]);
+        return true;
+      }
+      return false;
+    });
+  }
+
+  function highlightWinningCells() {
+    const winning = board.dataset.winning ? JSON.parse(board.dataset.winning) : [];
+    winning.forEach(idx => {
+      cells[idx].classList.add('highlight');
+    });
+    setTimeout(() => {
+      winning.forEach(idx => {
+        cells[idx].classList.remove('highlight');
+      });
+      board.dataset.winning = '';
+    }, 1400);
+  }
+
+  function nextRound() {
+    if (round < totalRounds) {
+      round++;
+      resetBoard(false);
+      winnerMessage.textContent = '';
+    } else {
+      let finalMsg = '';
+      if (scores.X > scores.O) finalMsg = 'Player X wins the series!';
+      else if (scores.O > scores.X) finalMsg = 'Player O wins the series!';
+      else finalMsg = "It's a draw series!";
+      winnerMessage.textContent = finalMsg;
+      gameActive = false;
+    }
+    updateScoreboard();
+  }
+
+  function resetBoard(resetScores = true) {
+    boardState = ['', '', '', '', '', '', '', '', ''];
+    cells.forEach(cell => cell.textContent = '');
+    currentPlayer = 'X';
+    gameActive = true;
+    winnerMessage.textContent = '';
+    moveHistory = [];
+    if (resetScores) {
+      scores = { X: 0, O: 0, Draws: 0 };
+      round = 1;
+      updateScoreboard();
+    }
+  }
+
+  function undoMove() {
+    if (!moveHistory.length || !gameActive) return;
+    const lastMove = moveHistory.pop();
+    boardState[lastMove.index] = '';
+    cells[lastMove.index].textContent = '';
+    currentPlayer = lastMove.player;
+    winnerMessage.textContent = '';
+  }
+
+  cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+
+  downloadBtn.addEventListener('click', () => {
+    html2canvas(document.querySelector('.container')).then(canvas => {
+      const link = document.createElement('a');
+      link.download = 'tic-tac-toe-winner.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+  });
+
+  restartBtn.addEventListener('click', () => {
+    resetBoard(true);
+    errorMsg.textContent = '';
+  });
+
+  setRoundsBtn.addEventListener('click', () => {
+    const val = roundInput.value.trim();
+    const num = Number(val);
+    // Validate: not empty, is integer, in range
+    if (
+      val === '' ||
+      isNaN(num) ||
+      !Number.isInteger(num) ||
+      num < MIN_ROUNDS ||
+      num > MAX_ROUNDS
+    ) {
+      errorMsg.textContent = `Please enter an integer between ${MIN_ROUNDS} and ${MAX_ROUNDS}.`;
+      return;
+    }
+    errorMsg.textContent = '';
+    totalRounds = num;
+    resetBoard(true);
+    updateScoreboard();
+  });
+
+  undoBtn.addEventListener('click', undoMove);
+
+  // Initialize scoreboard
+  updateScoreboard();
+</script>
+</body>
+</html>
